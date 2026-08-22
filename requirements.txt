@@ -1,0 +1,9 @@
+pdfplumber
+pydantic
+streamlit
+openpyxl
+google-genai
+python-dotenv
+tenacity
+pytest
+pandas

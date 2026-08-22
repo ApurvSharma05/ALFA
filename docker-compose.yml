@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  alfa:
+    build: .
+    container_name: alfa-app
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./SKILL.md:/app/SKILL.md:ro
+    restart: unless-stopped

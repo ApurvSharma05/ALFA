@@ -1,0 +1,17 @@
+# Environment variables
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+
+# Temp files and outputs
+*.tmp
+temp/
+*_Filled_BD.xlsx
+*_extracted.json
