@@ -1,222 +1,514 @@
 # ALFA: Automated Lead & Financial Analysis 📊
-### Transfer Pricing (TP) Business Development Fact Sheet Automation
+
+### Transfer Pricing Business Development Fact Sheet Automation
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B.svg)](https://streamlit.io/)
-[![Google GenAI](https://img.shields.io/badge/AI-Google%20Gemini-4285F4.svg)](https://ai.google.dev/)
+[![Google Gemini](https://img.shields.io/badge/AI-Google%20Gemini-4285F4.svg)](https://ai.google.dev/)
 [![OpenPyXL](https://img.shields.io/badge/Excel-openpyxl-217346.svg)](https://openpyxl.readthedocs.io/)
 [![Pydantic](https://img.shields.io/badge/Schema-Pydantic%20v2-E92063.svg)](https://docs.pydantic.dev/)
 [![Docker](https://img.shields.io/badge/Deploy-Docker-2496ED.svg)](https://www.docker.com/)
 
 ---
 
-## 📌 Overview
+## Overview
 
-**ALFA (Automated Lead & Financial Analysis)** is an intelligent document processing and financial analysis tool designed to automate the extraction and synthesis of complex corporate data from **Annual Reports (ARs) / Financial Statement PDFs** directly into standardized **Transfer Pricing (TP) Business Development (BD) Fact Sheet** Excel workbooks.
+**ALFA (Automated Lead & Financial Analysis)** is an AI-powered document processing system that automates the extraction of financial, tax, and corporate information from **Annual Reports and Financial Statement PDFs** and populates standardized **Transfer Pricing (TP) Business Development Fact Sheet** Excel templates.
 
-Developed during an EY Internship project by **Harshiv & Apurv**, ALFA addresses the tedious, error-prone manual process of reading 100+ page annual reports, extracting nuanced tax and financial data points, applying strict Transfer Pricing rules, and formatting them into strict corporate client templates.
+The system was developed during an **EY internship by Harshiv and Apurv** to reduce the manual effort involved in reviewing lengthy annual reports, locating relevant financial and related-party information, applying Transfer Pricing-specific extraction rules, and transferring the results into structured Excel workbooks.
 
----
+Instead of manually reviewing 100+ page reports and copying information into predefined templates, ALFA automates the workflow:
 
-## 🚀 Key Features
-
-- **Dual-Mode Extraction Engine (Text + Vision Fallback)**:
-  - **Primary (Text)**: Keyword-scored page filtering + native text extraction via `pdfplumber` — sends only the most relevant ~40 pages to the LLM, reducing token consumption by **70–80%**.
-  - **Fallback (Vision)**: Automatic heuristic detection (< 2,000 extracted characters) for scanned or image-heavy PDFs, routing seamlessly to Gemini Multimodal File API.
-- **Strict Structured JSON Schema**:
-  - Built with **Pydantic v2** field validators for numeric coercion, empty-name rejection, and graceful null handling.
-- **Fail-Safe API Resilience**:
-  - Exponential-backoff retries via **tenacity** (5 attempts, 2–30s wait) for `429` / `503` errors.
-  - Structured logging throughout. Uploaded files cleaned up in `finally` blocks.
-- **Concurrent Batch Processing**:
-  - `ThreadPoolExecutor` with configurable concurrency (1–5 workers) for parallel PDF extraction.
-- **Non-Destructive Excel Manipulation**:
-  - **Zero Style Degradation**: Preserves all native fonts, cell colors, borders, and number formats.
-  - **Dynamic Row Expansion**: Formula-safe row shifting via regex, merged-cell rewriting, and style cloning.
-  - **Source-Citing Cell Comments**: Every populated cell gets an Excel comment citing the exact AR page/section.
-- **Enterprise Streamlit Web UI**:
-  - Metric cards (Total, Succeeded, Failed), per-company status badges.
-  - **Human-in-the-loop previews**: Edit extracted financials, shareholding, RPT, and litigation in `st.data_editor` before generating Excel.
-  - **Bulk ZIP download**: One-click archive of all populated workbooks.
-  - Session state persistence across reruns.
-- **Docker-Ready Deployment**:
-  - Multi-stage `Dockerfile` and `docker-compose.yml` included.
-
----
-
-## 🏗️ Architecture
-
+```text
+Annual Report PDF
+       ↓
+Document Processing
+       ↓
+Relevant Section Detection
+       ↓
+AI-Powered Extraction
+       ↓
+Schema Validation
+       ↓
+Human Review
+       ↓
+Excel Fact Sheet
+       ↓
+Source-Cited Output
 ```
+
+---
+
+## Key Features
+
+### AI-Powered Document Extraction
+
+ALFA uses Google Gemini to extract structured financial and corporate information from annual reports.
+
+The extraction pipeline supports two modes:
+
+**Text Extraction**
+
+* Uses `pdfplumber` for native PDF text extraction.
+* Scores pages using domain-specific keywords.
+* Sends only relevant pages to the LLM.
+* Reduces unnecessary token usage and processing overhead.
+
+**Vision Fallback**
+
+* Detects scanned or image-heavy PDFs.
+* Automatically switches to Gemini's multimodal capabilities when sufficient text cannot be extracted.
+* Allows the same workflow to handle both digital and scanned reports.
+
+### Structured Data Validation
+
+Extracted information is converted into strongly typed Pydantic models.
+
+Validation handles:
+
+* Numeric values
+* Missing values
+* Invalid fields
+* Empty company names
+* Type coercion
+* Nullable fields
+* Structured financial data
+
+This prevents raw LLM output from being written directly into Excel without validation.
+
+### Transfer Pricing-Specific Extraction Rules
+
+The system is designed around domain-specific TP requirements rather than generic document extraction.
+
+Examples include:
+
+* Revenue from Operations used for turnover.
+* Other Income excluded from turnover calculations.
+* Total Expenses used for total cost.
+* Foreign Associated Enterprise service revenue extracted from relevant RPT disclosures.
+* Director shareholders identified individually.
+* Other promoters consolidated where applicable.
+* Related-party transactions grouped by nature.
+* Corporate entities separated from individual parties.
+* Litigation extracted specifically from the Contingent Liabilities section.
+* Extracted values linked to their source locations.
+
+These rules are maintained separately in `SKILL.md`, allowing the extraction behaviour to be updated without rewriting the application logic.
+
+### Source-Cited Excel Output
+
+Every populated value can include an Excel cell comment containing the source of the extracted information.
+
+For example:
+
+```text
+Source: Annual Report, Page 87
+Section: Related Party Transactions
+```
+
+This provides traceability between the generated fact sheet and the original annual report.
+
+### Non-Destructive Excel Processing
+
+ALFA populates existing corporate Excel templates without unnecessarily altering their formatting.
+
+The Excel engine preserves:
+
+* Fonts
+* Cell colors
+* Borders
+* Number formats
+* Merged cells
+* Existing formulas
+* Worksheet structure
+
+The system also supports dynamic row expansion when extracted data exceeds the original template capacity.
+
+Formula references are adjusted when rows are inserted to avoid breaking dependent calculations.
+
+### Human-in-the-Loop Review
+
+AI-generated results are not immediately treated as final.
+
+The Streamlit interface allows users to review and edit extracted:
+
+* Financial information
+* Shareholding information
+* Related-party transactions
+* Litigation information
+
+before generating the final workbook.
+
+This provides a practical human-in-the-loop workflow for high-accuracy business document processing.
+
+### Batch Processing
+
+Multiple annual reports can be processed in a single session.
+
+`ThreadPoolExecutor` enables configurable concurrent processing while maintaining individual success/failure states for each company.
+
+The application provides:
+
+* Total files processed
+* Successful extractions
+* Failed extractions
+* Per-company status
+* Bulk ZIP download
+
+### API Resilience
+
+The Gemini extraction layer includes retry handling using `tenacity`.
+
+The system handles transient:
+
+* `429` rate-limit errors
+* `503` service availability errors
+
+using exponential backoff.
+
+Temporary uploaded files are cleaned up using `finally` blocks.
+
+### Docker Support
+
+The application includes Docker configuration for reproducible deployment.
+
+```text
+Dockerfile
+docker-compose.yml
+```
+
+---
+
+## Architecture
+
+```text
 ┌─────────────────────────────────────────────────────┐
-│             Streamlit Web App (app.py)               │
-│   Uploads · Metrics · Preview Editor · ZIP Download  │
-└────────────────────────┬────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────┐
-│         Orchestration & Session State Engine         │
-│    ThreadPoolExecutor · st.session_state · Phases    │
-└──────────┬──────────────────────────┬───────────────┘
-           │                          │
-┌──────────▼────────────┐   ┌────────▼────────────────┐
-│ core/pdf_processor.py │   │   core/extractor.py      │
-│ - PDF Validation      │   │ - GeminiExtractor class  │
-│ - Section Filtering   │   │ - Tenacity retries       │
-│ - OCR/Vision routing  │   │ - File cleanup in finally│
-└───────────────────────┘   └────────┬────────────────┘
-                                     │
-┌────────────────────────────────────▼────────────────┐
-│              core/excel_engine.py                    │
-│  - FactSheetMapping config · FillResult metadata     │
-│  - Dynamic table expansion · Source comments         │
-└────────────────┬────────────────────────────────────┘
-                 │
-┌────────────────▼────────────────────────────────────┐
-│              core/safe_sheet.py                       │
-│  - Formula regex shifting · Merge preservation       │
-│  - Style cloning · Input validation + logging        │
-└─────────────────────────────────────────────────────┘
+│                  Streamlit Web App                  │
+│                                                     │
+│ Uploads · Processing · Preview · Editing · Export   │
+└─────────────────────────┬───────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────┐
+│              Orchestration Layer                    │
+│                                                     │
+│ Session State · Processing Phases · Batch Jobs      │
+│ ThreadPoolExecutor                                  │
+└───────────────┬─────────────────────┬───────────────┘
+                │                     │
+                ▼                     ▼
+┌────────────────────────┐  ┌─────────────────────────┐
+│ PDF Processing         │  │ AI Extraction           │
+│                        │  │                         │
+│ pdfplumber             │  │ Google Gemini            │
+│ Page filtering         │  │ Structured extraction   │
+│ PDF validation         │  │ Retry handling           │
+│ Vision fallback        │  │ Pydantic validation     │
+└────────────┬───────────┘  └────────────┬────────────┘
+             │                           │
+             └──────────────┬────────────┘
+                            ▼
+┌─────────────────────────────────────────────────────┐
+│                 Excel Engine                        │
+│                                                     │
+│ FactSheet Mapping · Data Population                 │
+│ Dynamic Row Expansion · Source Comments             │
+└─────────────────────────┬───────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────┐
+│                 Safe Sheet Layer                    │
+│                                                     │
+│ Formula Shifting · Merge Preservation               │
+│ Style Cloning · Validation                          │
+└─────────────────────────┬───────────────────────────┘
+                          │
+                          ▼
+                   Final Excel Fact Sheet
 ```
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
-```
+```text
 BD_automation/
-├── app.py                         # Streamlit entry point (thin orchestration)
-├── SKILL.md                       # Extraction system prompt & TP rules
-├── requirements.txt               # Python dependencies
-├── Dockerfile                     # Multi-stage Docker build
-├── docker-compose.yml             # Docker Compose configuration
-├── .env.example                   # Environment variable template
-├── .gitignore                     # Git ignore rules
+│
+├── app.py
+├── SKILL.md
+├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml
+├── .env.example
+├── .gitignore
+│
 ├── config/
 │   ├── __init__.py
-│   ├── settings.py                # Centralized settings (env vars, logging)
-│   └── template_mapping.py        # FactSheetMapping dataclass (cell coords)
+│   ├── settings.py
+│   └── template_mapping.py
+│
 ├── core/
 │   ├── __init__.py
-│   ├── schemas.py                 # Pydantic models with field validators
-│   ├── pdf_processor.py           # PDF validation, text extraction, filtering
-│   ├── extractor.py               # Gemini client with retries
-│   ├── excel_engine.py            # Excel population engine
-│   └── safe_sheet.py              # Formula-safe row insertion
+│   ├── schemas.py
+│   ├── pdf_processor.py
+│   ├── extractor.py
+│   ├── excel_engine.py
+│   └── safe_sheet.py
+│
 ├── ui/
 │   ├── __init__.py
-│   ├── styles.py                  # Custom CSS theming
-│   └── components.py              # Metric cards, previews, ZIP download
+│   ├── styles.py
+│   └── components.py
+│
 ├── tests/
 │   ├── __init__.py
-│   ├── test_schemas.py            # Schema validation tests
-│   ├── test_formula_shift.py      # Formula shift & row insertion tests
-│   └── test_excel_engine.py       # Excel engine integration tests
-├── archive/                       # Historical iterations & references
-│   ├── fill_factsheet_v1.py
-│   ├── safe_insert_rows_v1.py
+│   ├── test_schemas.py
+│   ├── test_formula_shift.py
+│   └── test_excel_engine.py
+│
+├── archive/
 │   └── ...
+│
 └── README.md
 ```
 
 ---
 
-## ⚙️ Installation & Setup
+## Technology Stack
 
-### 1. Prerequisites
-- Python 3.10 or higher
-- Google Gemini API Key ([Get an API Key here](https://aistudio.google.com/))
+| Technology        | Purpose                                          |
+| ----------------- | ------------------------------------------------ |
+| **Python 3.10+**  | Core application                                 |
+| **Google Gemini** | AI-powered document understanding and extraction |
+| **pdfplumber**    | Native PDF text extraction                       |
+| **OpenPyXL**      | Excel template manipulation                      |
+| **Pydantic v2**   | Structured schemas and validation                |
+| **Tenacity**      | API retry and exponential backoff                |
+| **Streamlit**     | Web interface                                    |
+| **Pandas**        | Data preview and manipulation                    |
+| **Pytest**        | Automated testing                                |
+| **Docker**        | Containerized deployment                         |
 
-### 2. Clone & Create Virtual Environment
+---
+
+## Installation
+
+### Prerequisites
+
+* Python 3.10+
+* Google Gemini API key
+* Git
+
+### 1. Clone the repository
+
 ```bash
 git clone https://github.com/Harshiv15/BD_automation.git
 cd BD_automation
-python -m venv .venv
+```
 
-# Activate (Windows PowerShell):
+### 2. Create a virtual environment
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-# Activate (Linux / macOS):
+```
+
+Linux/macOS:
+
+```bash
+python -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3. Install Dependencies
+### 3. Install dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure Environment Variables
+### 4. Configure environment variables
+
+Copy the example environment file:
+
 ```bash
 cp .env.example .env
 ```
-Edit `.env` and paste your Gemini API key:
+
+Configure:
+
 ```env
-GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_API_KEY=your_gemini_api_key
 GEMINI_MODEL=gemini-flash-latest
 ```
 
+Never commit API keys or other secrets to Git.
+
 ---
 
-## 🖥️ Usage
+## Running the Application
 
-### Run Locally
+Start the Streamlit application:
+
 ```bash
 streamlit run app.py
 ```
 
-### Run with Docker
+The application will be available at:
+
+```text
+http://localhost:8501
+```
+
+---
+
+## Docker
+
+Build and start the application:
+
 ```bash
 docker-compose up --build
 ```
-Access at [http://localhost:8501](http://localhost:8501).
 
-### Run Tests
+Then open:
+
+```text
+http://localhost:8501
+```
+
+---
+
+## Workflow
+
+### 1. Upload the Fact Sheet Template
+
+Upload the standardized `.xlsx` template that should be populated.
+
+### 2. Upload Annual Reports
+
+Select one or more annual report `.pdf` files.
+
+### 3. Start Extraction
+
+ALFA:
+
+1. Validates the PDFs.
+2. Extracts native text where possible.
+3. Identifies relevant pages.
+4. Uses Gemini for structured extraction.
+5. Validates the result using Pydantic.
+6. Falls back to multimodal processing when necessary.
+
+### 4. Review the Results
+
+Review the extracted information through the Streamlit interface.
+
+Values can be edited before the final workbook is generated.
+
+### 5. Generate Fact Sheets
+
+The validated data is written into the original Excel template while preserving its formatting and structure.
+
+Individual files or a combined ZIP archive can then be downloaded.
+
+---
+
+## Domain Extraction Rules
+
+The extraction logic follows Transfer Pricing-specific business rules defined in `SKILL.md`.
+
+| Category             | Rule                                                             |
+| -------------------- | ---------------------------------------------------------------- |
+| **Turnover**         | Revenue from Operations only; Other Income excluded              |
+| **Total Cost**       | Total Expenses                                                   |
+| **AE Revenue Split** | Foreign AE service revenue from relevant RPT disclosures         |
+| **Shareholding**     | Director shareholders individually; other promoters consolidated |
+| **Related Parties**  | Corporate entities extracted and grouped by transaction nature   |
+| **Litigation**       | Extracted strictly from Contingent Liabilities disclosures       |
+| **Source Comments**  | Populated cells include source information where available       |
+
+The goal is not simply to extract text, but to apply the business rules required for the downstream TP fact sheet.
+
+---
+
+## Testing
+
+Run the test suite with:
+
 ```bash
 python -m pytest tests/ -v
 ```
 
-### Step-by-Step Workflow
-1. **Enter API Key** in the sidebar (or configure via `.env`)
-2. **Upload Template**: Upload the BD Fact Sheet `.xlsx` template
-3. **Upload Annual Reports**: Select one or more AR `.pdf` files
-4. **Start Extraction**: Click 🚀 — PDFs are processed concurrently via Gemini
-5. **Review & Edit**: Inspect and modify extracted values in interactive tables
-6. **Generate Excel**: Click 📊 — download individual files or a bulk ZIP
+Current tests cover areas including:
+
+* Pydantic schema validation
+* Formula shifting
+* Excel row insertion
+* Excel engine behaviour
 
 ---
 
-## 📋 Domain Rules (SKILL.md)
+## Design Principles
 
-| Category | Extraction Rule |
-| :--- | :--- |
-| **Turnover** | Revenue from Operations **only** (excludes Other Income) |
-| **Total Cost** | Total Expenses |
-| **AE Revenue Split** | Foreign AE service revenues from the RPT section |
-| **Shareholding** | Director shareholders individually; other promoters consolidated |
-| **Related Party (RPT)** | Corporate entities only; collated by nature; verbatim labels |
-| **Litigation** | Strictly from Contingent Liabilities note; zero hallucination |
-| **Review Comments** | Every cell gets a source-citing Excel comment |
+ALFA is built around five core principles:
 
----
+**1. Relevant context over brute-force processing**
 
-## 📦 Dependencies
+Only relevant portions of large annual reports are prioritized for extraction whenever native text is available.
 
-| Package | Purpose |
-| :--- | :--- |
-| `streamlit` | Interactive web application |
-| `google-genai` | Google Gemini API SDK |
-| `pydantic` | Strict data schema validation |
-| `pdfplumber` | PDF text extraction |
-| `openpyxl` | Excel workbook manipulation |
-| `tenacity` | Retry logic with exponential backoff |
-| `python-dotenv` | Environment variable management |
-| `pandas` | Data preview tables |
-| `pytest` | Automated testing |
+**2. Structured output over raw LLM responses**
+
+LLM responses are validated against explicit schemas before entering the Excel layer.
+
+**3. Traceability**
+
+Extracted information should remain traceable to the source document.
+
+**4. Human-in-the-loop validation**
+
+Users can inspect and correct AI-generated results before final output.
+
+**5. Preserve existing business templates**
+
+The system populates existing Excel workbooks rather than forcing users into a new output format.
 
 ---
 
-## 👥 Authors
+## Future Improvements
 
+Potential areas for further development include:
+
+* Improved semantic section detection
+* More advanced document-level OCR
+* Extraction confidence scoring
+* Automated anomaly detection
+* Expanded evaluation datasets
+* Additional financial statement formats
+* Enterprise authentication
+* Audit logging
+* Cloud-based document storage
+* Fine-grained extraction provenance
+
+---
+
+## Authors
+
+<<<<<<< HEAD
 - **Harshiv** & **Apurv** — Project creators (EY Internship Project)
 #   A L F A 
  
  #   A L F A 
  
  
+=======
+**Harshiv & Apurv**
+
+Developed as an **EY Internship Project** focused on applying AI and automation to real-world Transfer Pricing business processes.
+
+---
+
+## Disclaimer
+
+This project was developed as an internship automation project. It is intended to assist with document processing and data preparation and does not replace professional review or judgment.
+>>>>>>> e475b2b346a2316861e974af27f50c34be17e0d2
