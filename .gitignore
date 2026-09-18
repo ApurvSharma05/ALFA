@@ -6,12 +6,27 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.venv/
 venv/
 env/
-.venv/
+.pytest_cache/
 
 # Temp files and outputs
 *.tmp
 temp/
 *_Filled_BD.xlsx
 *_extracted.json
+~$*
+
+# Docs (generated reports — keep templates, ignore generated)
+docs/*.docx
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

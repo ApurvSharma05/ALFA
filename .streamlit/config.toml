@@ -1,0 +1,71 @@
+# ALFA — Professional Financial Theme
+# Dual-mode: dark (default) + light (user toggle in Streamlit Settings)
+
+[theme]
+# Typography — Clean, professional fonts
+font = "'Inter':https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+headingFont = "'Inter':https://fonts.googleapis.com/css2?family=Inter:wght@600;700&display=swap"
+codeFont = "'JetBrains Mono':https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+baseFontSize = 14
+baseFontWeight = 400
+codeFontSize = "13px"
+headingFontSizes = ["28px", "22px", "18px", "16px", "14px", "12px"]
+headingFontWeights = [700, 600, 600, 600, 500, 500]
+linkUnderline = false
+baseRadius = "8px"
+buttonRadius = "8px"
+showWidgetBorder = true
+showSidebarBorder = true
+
+# Semantic colors for financial indicators
+greenColor = "#34D399"
+redColor = "#F87171"
+yellowColor = "#FBBF24"
+orangeColor = "#FB923C"
+blueColor = "#60A5FA"
+violetColor = "#A78BFA"
+grayColor = "#94A3B8"
+
+chartCategoricalColors = ["#60A5FA", "#34D399", "#A78BFA", "#F87171", "#FBBF24", "#38BDF8", "#94A3B8", "#FB923C"]
+
+# ── Dark Mode ──
+[theme.dark]
+primaryColor = "#60A5FA"
+backgroundColor = "#0F172A"
+secondaryBackgroundColor = "#1E293B"
+codeBackgroundColor = "#1E293B"
+textColor = "#F1F5F9"
+linkColor = "#60A5FA"
+borderColor = "#334155"
+codeTextColor = "#CBD5E1"
+dataframeBorderColor = "#334155"
+dataframeHeaderBackgroundColor = "#1E293B"
+
+[theme.dark.sidebar]
+backgroundColor = "#1E293B"
+secondaryBackgroundColor = "#334155"
+codeBackgroundColor = "#1E293B"
+textColor = "#F1F5F9"
+borderColor = "#475569"
+primaryColor = "#60A5FA"
+
+# ── Light Mode ──
+[theme.light]
+primaryColor = "#2563EB"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F1F5F9"
+codeBackgroundColor = "#F1F5F9"
+textColor = "#1E293B"
+linkColor = "#2563EB"
+borderColor = "#CBD5E1"
+codeTextColor = "#334155"
+dataframeBorderColor = "#E2E8F0"
+dataframeHeaderBackgroundColor = "#F1F5F9"
+
+[theme.light.sidebar]
+backgroundColor = "#F8FAFC"
+secondaryBackgroundColor = "#E2E8F0"
+codeBackgroundColor = "#E2E8F0"
+textColor = "#1E293B"
+borderColor = "#CBD5E1"
+primaryColor = "#2563EB"

@@ -24,10 +24,10 @@ def render_metrics_bar(total: int, success: int, failed: int, pending: int):
     """Render a row of four styled metric cards."""
     cols = st.columns(4)
     cards = [
-        ("total", "📋 Total", total),
-        ("success", "✅ Succeeded", success),
-        ("failed", "❌ Failed", failed),
-        ("pending", "⏳ Pending", pending),
+        ("total", ":material/description: Total", total),
+        ("success", ":material/check_circle: Succeeded", success),
+        ("failed", ":material/error: Failed", failed),
+        ("pending", ":material/schedule: Pending", pending),
     ]
     for col, (css_class, label, value) in zip(cols, cards):
         with col:
@@ -47,10 +47,10 @@ def render_metrics_bar(total: int, success: int, failed: int, pending: int):
 # ---------------------------------------------------------------------------
 
 _STATUS_LABELS = {
-    "pending": "⏳ Pending",
-    "processing": "⚙️ Processing",
-    "success": "✅ Success",
-    "failed": "❌ Failed",
+    "pending": "Pending",
+    "processing": "Processing",
+    "success": "Success",
+    "failed": "Failed",
 }
 
 
@@ -88,9 +88,9 @@ def render_preview_editor(data: dict, company_name: str) -> dict:
     """
     f_ = data["fields"]
 
-    st.subheader(f"📝 Review: {company_name}")
+    st.subheader(f"Review: {company_name}", anchor=False)
 
-    with st.expander("📊 Financial Summary", expanded=False):
+    with st.expander("Financial summary", icon=":material/bar_chart:", expanded=False):
         fin_df = pd.DataFrame([
             {"Field": "Standalone Turnover FY25 (₹L)", "Value": f_["standalone_turnover_fy25_lakhs"]["value"],
              "Source": f_["standalone_turnover_fy25_lakhs"]["source"]},
@@ -105,7 +105,7 @@ def render_preview_editor(data: dict, company_name: str) -> dict:
             {"Field": "Cash FY24 (₹L)", "Value": f_["cash_fy24_lakhs"]["value"],
              "Source": f_["cash_fy24_lakhs"]["source"]},
         ])
-        edited_fin = st.data_editor(fin_df, use_container_width=True, key=f"fin_{company_name}", num_rows="fixed")
+        edited_fin = st.data_editor(fin_df, key=f"fin_{company_name}", num_rows="fixed")
 
         # Write back edits
         fin_fields = [
@@ -116,29 +116,29 @@ def render_preview_editor(data: dict, company_name: str) -> dict:
         for i, field_name in enumerate(fin_fields):
             f_[field_name]["value"] = edited_fin.iloc[i]["Value"]
 
-    with st.expander("👥 Shareholding", expanded=False):
+    with st.expander("Shareholding", icon=":material/group:", expanded=False):
         sh_rows = f_["shareholding"]["rows"]
         sh_df = pd.DataFrame(sh_rows)
-        edited_sh = st.data_editor(sh_df, use_container_width=True, key=f"sh_{company_name}", num_rows="dynamic")
+        edited_sh = st.data_editor(sh_df, key=f"sh_{company_name}", num_rows="dynamic")
         f_["shareholding"]["rows"] = edited_sh.to_dict("records")
 
-    with st.expander("🤝 Related Party Transactions", expanded=False):
+    with st.expander("Related party transactions", icon=":material/handshake:", expanded=False):
         rpt_items = f_["related_party_transactions_lakhs"]["items"]
         if rpt_items:
             rpt_df = pd.DataFrame(rpt_items)
-            edited_rpt = st.data_editor(rpt_df, use_container_width=True, key=f"rpt_{company_name}", num_rows="dynamic")
+            edited_rpt = st.data_editor(rpt_df, key=f"rpt_{company_name}", num_rows="dynamic")
             f_["related_party_transactions_lakhs"]["items"] = edited_rpt.to_dict("records")
         else:
-            st.info("No related party transactions extracted.")
+            st.info("No related party transactions extracted.", icon=":material/info:")
 
-    with st.expander("⚖️ Litigation", expanded=False):
+    with st.expander("Litigation", icon=":material/gavel:", expanded=False):
         lit_items = f_["litigation"]["items"]
         if lit_items:
             lit_df = pd.DataFrame(lit_items)
-            edited_lit = st.data_editor(lit_df, use_container_width=True, key=f"lit_{company_name}", num_rows="dynamic")
+            edited_lit = st.data_editor(lit_df, key=f"lit_{company_name}", num_rows="dynamic")
             f_["litigation"]["items"] = edited_lit.to_dict("records")
         else:
-            st.info("No litigation items extracted.")
+            st.info("No litigation items extracted.", icon=":material/info:")
 
     return data
 
@@ -173,30 +173,29 @@ def render_download_section(results: Dict[str, bytes], errors: Dict[str, str]):
         st.warning("No successfully processed files to download.")
         return
 
-    st.markdown("---")
-    st.subheader("📥 Downloads")
+    st.subheader("Downloads", anchor=False)
 
     # Individual buttons
     for i, (name, data) in enumerate(results.items()):
         st.download_button(
-            label=f"📄 Download: {name}",
+            label=f"Download: {name}",
             data=data,
             file_name=f"{name}_Populated_BD.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"dl_btn_{i}",
+            icon=":material/download:",
         )
 
     # Bulk ZIP
     if len(results) > 1:
-        st.markdown("---")
         zip_files = {f"{name}_Populated_BD.xlsx": data for name, data in results.items()}
         zip_bytes = create_zip_download(zip_files)
-        st.markdown('<div class="zip-download">', unsafe_allow_html=True)
         st.download_button(
-            label=f"📦 Download All ({len(results)} files) as ZIP",
+            label=f"Download all ({len(results)} files) as ZIP",
             data=zip_bytes,
             file_name="ALFA_Populated_BD_All.zip",
             mime="application/zip",
             key="dl_zip",
+            type="primary",
+            icon=":material/folder_zip:",
         )
-        st.markdown("</div>", unsafe_allow_html=True)

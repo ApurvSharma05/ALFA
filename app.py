@@ -40,7 +40,7 @@ from ui.components import (
 # ---------------------------------------------------------------------------
 st.set_page_config(
     page_title="ALFA — Automated Lead & Financial Analysis",
-    page_icon="📊",
+    page_icon=":material/insights:",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -70,18 +70,24 @@ for key, default in _DEFAULTS.items():
 settings = load_settings()
 
 with st.sidebar:
-    st.header("⚙️ Settings")
+    st.header("Settings", anchor=False)
+
     api_key = st.text_input(
-        "Gemini API Key",
+        "Gemini API key",
         value=settings.gemini_api_key,
         type="password",
         help="Get a key at https://aistudio.google.com/",
     )
     model_choice = st.text_input("Model", value=settings.gemini_model)
-    max_workers = st.slider("Concurrency", min_value=1, max_value=5, value=settings.max_workers,
-                            help="Number of PDFs to process simultaneously")
+    max_workers = st.slider(
+        "Concurrency",
+        min_value=1,
+        max_value=5,
+        value=settings.max_workers,
+        help="Number of PDFs to process simultaneously",
+    )
 
-    with st.expander("🔧 Advanced"):
+    with st.expander("Advanced", icon=":material/tune:"):
         vision_threshold = st.number_input(
             "Vision fallback threshold (chars)",
             value=settings.vision_fallback_threshold,
@@ -97,24 +103,23 @@ with st.sidebar:
             step=5,
         )
 
-    st.markdown("---")
-    st.caption("ALFA v2.0 — Refactored Architecture")
+    st.caption("Made by: APURV SHARMA")
 
 
 # ---------------------------------------------------------------------------
 # Header
 # ---------------------------------------------------------------------------
-st.title("📊 ALFA")
+st.title("ALFA", anchor=False)
 st.caption("Automated Lead & Financial Analysis — TP BD Fact Sheet Automation")
 
-with st.expander("ℹ️ How to use ALFA"):
+with st.expander("How to use ALFA", icon=":material/help:"):
     st.markdown("""
 **ALFA** automates the extraction of financial data from Annual Reports (ARs)
 into standardized BD Fact Sheet Excel templates.
 
 **Workflow:**
 1. Upload your BD template (`.xlsx`) and one or more Annual Report PDFs
-2. Click **Start Extraction** — ALFA processes PDFs concurrently via Gemini
+2. Click **Start extraction** — ALFA processes PDFs concurrently via Gemini
 3. **Review** extracted data in interactive tables — edit any values
 4. Click **Generate Excel** — download individual files or a bulk ZIP
     """)
@@ -125,9 +130,18 @@ into standardized BD Fact Sheet Excel templates.
 # ---------------------------------------------------------------------------
 col1, col2 = st.columns(2)
 with col1:
-    excel_template = st.file_uploader("📁 Upload BD Template", type=["xlsx"])
+    excel_template = st.file_uploader(
+        "BD template",
+        type=["xlsx"],
+        help="Upload the BD Fact Sheet Excel template",
+    )
 with col2:
-    pdf_files = st.file_uploader("📄 Upload Annual Reports", type=["pdf"], accept_multiple_files=True)
+    pdf_files = st.file_uploader(
+        "Annual reports",
+        type=["pdf"],
+        accept_multiple_files=True,
+        help="Upload one or more Annual Report PDFs",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +167,12 @@ def _process_single_pdf(pdf_path: str, company_name: str, extractor: GeminiExtra
         return {"company": company_name, "error": result.error, "mode": result.mode}
 
 
-if st.button("🚀 Start Extraction", type="primary", disabled=not (api_key and excel_template and pdf_files)):
+if st.button(
+    "Start extraction",
+    type="primary",
+    icon=":material/play_arrow:",
+    disabled=not (api_key and excel_template and pdf_files),
+):
     # Reset state
     for key in ["extraction_results", "extraction_errors", "extraction_modes", "excel_bytes", "fill_warnings"]:
         st.session_state[key] = {}
@@ -225,8 +244,6 @@ if st.session_state["processing_complete"]:
         pending=0,
     )
 
-    st.markdown("---")
-
     # Status cards
     for name in sorted(results.keys()):
         render_company_card(name, "success", mode=modes.get(name, ""))
@@ -238,8 +255,7 @@ if st.session_state["processing_complete"]:
 # Phase 2: REVIEW (editable previews)
 # ---------------------------------------------------------------------------
 if st.session_state["phase"] == "review" and st.session_state["extraction_results"]:
-    st.markdown("---")
-    st.header("📝 Review & Edit Extracted Data")
+    st.header("Review & edit extracted data", anchor=False)
     st.caption("Modify any values below before generating the final Excel files.")
 
     for company_name, data in st.session_state["extraction_results"].items():
@@ -250,8 +266,7 @@ if st.session_state["phase"] == "review" and st.session_state["extraction_result
     # ---------------------------------------------------------------------------
     # Phase 3: GENERATE EXCEL
     # ---------------------------------------------------------------------------
-    st.markdown("---")
-    if st.button("📊 Generate Excel Files", type="primary"):
+    if st.button("Generate Excel files", type="primary", icon=":material/table_chart:"):
         if not excel_template:
             st.error("Template file is required. Please re-upload.")
         else:
@@ -336,5 +351,4 @@ if st.session_state["phase"] == "generate" and st.session_state["excel_bytes"]:
 # ---------------------------------------------------------------------------
 # Footer
 # ---------------------------------------------------------------------------
-st.markdown("---")
-st.caption("⚠️ All outputs are drafts for human review. Verify extracted figures against the source Annual Report.")
+st.caption(":material/info: All outputs are drafts for human review. Verify extracted figures against the source Annual Report.")
