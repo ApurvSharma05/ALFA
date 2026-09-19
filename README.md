@@ -232,10 +232,10 @@ docker-compose.yml
 ## Repository Structure
 
 ```text
-BD_automation/
+ALFA/
 │
-├── app.py
-├── SKILL.md
+├── app.py                    # Streamlit entry point
+├── SKILL.md                  # Extraction rules
 ├── requirements.txt
 ├── Dockerfile
 ├── docker-compose.yml
@@ -262,12 +262,18 @@ BD_automation/
 │
 ├── tests/
 │   ├── __init__.py
+│   ├── test_alfa_flow.py
 │   ├── test_schemas.py
 │   ├── test_formula_shift.py
 │   └── test_excel_engine.py
 │
-├── archive/
-│   └── ...
+├── data/
+│   ├── inputs/               # Annual report PDFs
+│   ├── templates/            # Excel and Markdown templates
+│   └── outputs/              # Generated JSON and Excel files
+│
+├── scripts/                  # Maintenance and generation utilities
+├── archive/                  # Retired implementations
 │
 └── README.md
 ```
