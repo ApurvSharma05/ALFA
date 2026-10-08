@@ -1,0 +1,62 @@
+{
+  "_comment": "ALFA Golden Evaluation Dataset — ground-truth expected values for automated benchmarking.",
+  "_instructions": [
+    "Each entry represents one company annual report evaluation case.",
+    "Fields with 'expected_*' keys are ground-truth values verified against the actual Annual Report.",
+    "Run scripts/run_eval.py to compare ALFA extractions against these values.",
+    "To add a new case: add an entry to the 'cases' array, populate 'expected_fields' with",
+    "  verified values from the annual report, and set 'pdf_path' to the relative PDF path.",
+    "Amounts are always in Indian Rupees Lakhs (₹L) unless otherwise noted."
+  ],
+  "version": "1.0",
+  "cases": [
+    {
+      "company": "Astute Systems Pvt Ltd",
+      "fiscal_year": "FY2025",
+      "pdf_path": "data/inputs/Astute Systems Pvt Ltd(CBTP20)_2025_March.pdf",
+      "notes": "Populate this entry with verified values extracted from the Annual Report.",
+      "expected_fields": {
+        "standalone_turnover_fy25_lakhs": null,
+        "standalone_total_cost_fy25_lakhs": null,
+        "cash_fy25_lakhs": null,
+        "ae_trade_receivables_fy25_lakhs": null,
+        "shareholding": {
+          "expected_rows_count": null,
+          "expected_total_shares_fy25": null
+        },
+        "rpt": {
+          "expected_items_count": null,
+          "expected_labels": []
+        },
+        "litigation": {
+          "expected_items_count": null
+        }
+      },
+      "status": "TODO — fill in expected values from the Annual Report before running eval"
+    },
+    {
+      "company": "Avance Technologies Ltd",
+      "fiscal_year": "FY2025",
+      "pdf_path": "data/inputs/Avance Technologies LtdCBTP20_2025_March.pdf",
+      "notes": "Populate this entry with verified values extracted from the Annual Report.",
+      "expected_fields": {
+        "standalone_turnover_fy25_lakhs": null,
+        "standalone_total_cost_fy25_lakhs": null,
+        "cash_fy25_lakhs": null,
+        "ae_trade_receivables_fy25_lakhs": null,
+        "shareholding": {
+          "expected_rows_count": null,
+          "expected_total_shares_fy25": null
+        },
+        "rpt": {
+          "expected_items_count": null,
+          "expected_labels": []
+        },
+        "litigation": {
+          "expected_items_count": null
+        }
+      },
+      "status": "TODO — fill in expected values from the Annual Report before running eval"
+    }
+  ]
+}

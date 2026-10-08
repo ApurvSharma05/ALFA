@@ -25,7 +25,7 @@ from config.settings import load_settings, get_system_prompt, logger
 from config.template_mapping import FactSheetMapping
 from core.pdf_processor import validate_pdf, extract_relevant_pages, is_scanned_pdf
 from core.extractor import GeminiExtractor
-from core.excel_engine import fill_factsheet
+from core.excel_engine import fill_factsheet, expand_dynamic_tables
 from core.safe_sheet import insert_rows_safe
 from ui.styles import inject_styles
 from ui.components import (
@@ -296,7 +296,7 @@ if st.session_state["phase"] == "review" and st.session_state["extraction_result
                         template_to_use = template_path
                         required_sh_rows = len(data["fields"]["shareholding"]["rows"])
                         if required_sh_rows > mapping.shareholding_default_capacity:
-                            expanded_path = os.path.join(temp_dir, f"expanded_{company_name}.xlsx")
+                            expanded_path = os.path.join(temp_dir, f"expanded_sh_{company_name}.xlsx")
                             delta = required_sh_rows - mapping.shareholding_default_capacity
                             insert_rows_safe(
                                 src_path=template_path,
@@ -306,6 +306,16 @@ if st.session_state["phase"] == "review" and st.session_state["extraction_result
                                 delta=delta,
                             )
                             template_to_use = expanded_path
+
+                        # Expand RPT and Litigation tables dynamically if needed
+                        rpt_lit_expanded_path = os.path.join(temp_dir, f"expanded_rpt_lit_{company_name}.xlsx")
+                        template_to_use, _ = expand_dynamic_tables(
+                            data=data,
+                            template_path=template_to_use,
+                            out_path=rpt_lit_expanded_path,
+                            sheet_name=sheet_name,
+                            mapping=mapping,
+                        )
 
                         # Fill
                         out_path = os.path.join(temp_dir, f"{company_name}_Filled.xlsx")
@@ -342,10 +352,17 @@ if st.session_state["phase"] == "review" and st.session_state["extraction_result
 # Phase 3: DOWNLOAD
 # ---------------------------------------------------------------------------
 if st.session_state["phase"] == "generate" and st.session_state["excel_bytes"]:
+    st.success(
+        f"Excel files generated successfully! {len(st.session_state['excel_bytes'])} file(s) ready for download.",
+        icon=":material/check_circle:",
+    )
+
     render_download_section(
         results=st.session_state["excel_bytes"],
         errors=st.session_state["extraction_errors"],
     )
+
+    st.toast("Excel files are ready for download!", icon=":material/download:")
 
 
 # ---------------------------------------------------------------------------

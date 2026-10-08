@@ -168,20 +168,54 @@ class TestFillFactsheet:
             assert ws["C3"].comment is not None
             assert "Source:" in ws["C3"].comment.text
 
-    def test_rpt_items_dropped_when_over_capacity(self):
-        """RPT items exceeding capacity should be dropped with a warning."""
+    def test_rpt_all_items_written_after_expansion(self):
+        """
+        After expand_dynamic_tables() pre-expands the template, fill_factsheet()
+        should write ALL RPT items with zero drops.
+        This validates the end-to-end pipeline that replaced the old silent-drop behaviour.
+        """
+        from core.excel_engine import expand_dynamic_tables
+
         with tempfile.TemporaryDirectory() as td:
             template = _create_minimal_template(os.path.join(td, "template.xlsx"))
             data = _make_minimal_data(num_rpt=10)  # exceeds default capacity of 7
+            expanded = os.path.join(td, "expanded.xlsx")
             out = os.path.join(td, "out.xlsx")
 
-            result = fill_factsheet(data, template, out, "Sheet1")
+            # Step 1: pre-expand
+            template_to_use, delta = expand_dynamic_tables(
+                data=data,
+                template_path=template,
+                out_path=expanded,
+                sheet_name="Sheet1",
+            )
+            assert delta == 3  # 10 - 7 = 3 rows added
+
+            # Step 2: fill
+            result = fill_factsheet(data, template_to_use, out, "Sheet1")
 
             assert result.success
-            assert result.rpt_rows_written == 7
-            assert result.rpt_rows_dropped == 3
-            assert len(result.warnings) >= 1
-            assert "RPT" in result.warnings[0]
+            assert result.rpt_rows_written == 10
+            assert result.rpt_rows_dropped == 0
+            assert result.warnings == []  # no overflow warnings
+
+    def test_rpt_fill_without_expansion_no_crash(self):
+        """
+        fill_factsheet() called alone (without pre-expansion) on a template that
+        is too small should still succeed — it will write as many items as the
+        default capacity allows and produce zero drops because fill no longer
+        enforces the old cap (that responsibility moved to expand_dynamic_tables).
+        This ensures backwards-compatibility for callers that bypass expansion.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            template = _create_minimal_template(os.path.join(td, "template.xlsx"))
+            data = _make_minimal_data(num_rpt=10)
+            out = os.path.join(td, "out.xlsx")
+
+            # Should not raise — fill writes all items into available rows.
+            result = fill_factsheet(data, template, out, "Sheet1")
+            assert result.success
+            assert result.rpt_rows_dropped == 0  # no silent drops
 
     def test_unused_rows_hidden(self):
         """When fewer items than capacity, unused rows should be hidden."""

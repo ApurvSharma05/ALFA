@@ -11,10 +11,9 @@ Refactored from fill_factsheet.py with:
   - Same hard rules: never touch formatting, always add source comments
 """
 
-import json
 import logging
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from openpyxl import load_workbook
 from openpyxl.comments import Comment
@@ -66,6 +65,130 @@ def _find_total_row(ws, start_data_row: int, label: str = "Total", max_scan: int
         if ws[f"C{r}"].value == label:
             return r
     raise ValueError(f"Could not locate '{label}' row scanning from row {start_data_row}")
+
+
+# ---------------------------------------------------------------------------
+# Pre-fill table expansion
+# ---------------------------------------------------------------------------
+
+def expand_dynamic_tables(
+    data: dict,
+    template_path: str,
+    out_path: str,
+    sheet_name: str,
+    mapping: FactSheetMapping | None = None,
+) -> Tuple[str, int]:
+    """
+    Pre-expand the RPT and Litigation tables in the template to accommodate
+    the actual number of extracted items.  Must be called AFTER shareholding
+    expansion (if any) and BEFORE fill_factsheet().
+
+    Unlike shareholding expansion (which is handled in app.py because it
+    affects all downstream row offsets), RPT and Litigation expansion is
+    isolated here because their offsets are computed dynamically from the
+    shareholding total row found at fill time.
+
+    Algorithm
+    ---------
+    The shareholding Total row moves unpredictably when shareholding is
+    expanded, so we open the (already-expanded) workbook, locate the Total
+    row, derive the exact RPT and Litigation insertion points, and call
+    insert_rows_safe() for each table that needs more capacity.
+
+    Args:
+        data:          parsed CompanyData dict (already validated)
+        template_path: path to the template (after any shareholding expansion)
+        out_path:      path to write the final expanded template to
+        sheet_name:    worksheet name inside the workbook
+        mapping:       FactSheetMapping (uses defaults if None)
+
+    Returns:
+        Tuple of (path_to_use, cumulative_delta) where path_to_use is either
+        out_path (if any expansion happened) or template_path (no-op).
+    """
+    if mapping is None:
+        mapping = FactSheetMapping()
+
+    f_ = data["fields"]
+    rpt_items = f_["related_party_transactions_lakhs"]["items"]
+    lit_items = f_["litigation"]["items"]
+
+    rpt_needed = len(rpt_items)
+    lit_needed = len(lit_items)
+
+    if rpt_needed <= mapping.rpt_default_capacity and lit_needed <= mapping.lit_default_capacity:
+        # Nothing to expand — pass template through unchanged.
+        logger.debug("No dynamic table expansion required (RPT=%d, Lit=%d)", rpt_needed, lit_needed)
+        return template_path, 0
+
+    # Open workbook to locate the actual Total row (may have shifted due to
+    # prior shareholding expansion).
+    wb = load_workbook(template_path)
+    ws = wb[sheet_name]
+    try:
+        total_row = _find_total_row(ws, mapping.shareholding_start_row, mapping.shareholding_total_label)
+    finally:
+        wb.close()
+
+    current_path = template_path
+    cumulative_delta = 0
+
+    # ── Expand RPT table ──────────────────────────────────────────────────────
+    if rpt_needed > mapping.rpt_default_capacity:
+        delta_rpt = rpt_needed - mapping.rpt_default_capacity
+        # RPT data starts at total_row + rpt_header_offset + 1.
+        # We insert BEFORE the first RPT data row so the header stays in place.
+        rpt_data_start = total_row + mapping.rpt_header_offset + 1 + cumulative_delta
+        rpt_expanded_path = out_path + ".rpt_expanded.tmp"
+        insert_rows_safe(
+            src_path=current_path,
+            out_path=rpt_expanded_path,
+            sheet_name=sheet_name,
+            threshold=rpt_data_start,
+            delta=delta_rpt,
+        )
+        current_path = rpt_expanded_path
+        cumulative_delta += delta_rpt
+        logger.info(
+            "RPT table expanded by %d rows (needed %d, had %d)",
+            delta_rpt, rpt_needed, mapping.rpt_default_capacity,
+        )
+
+    # ── Expand Litigation table ───────────────────────────────────────────────
+    if lit_needed > mapping.lit_default_capacity:
+        delta_lit = lit_needed - mapping.lit_default_capacity
+        # Compute lit_start accounting for all prior deltas:
+        # lit_header = countries_row + lit_header_offset_from_countries
+        # countries_row = rpt_start + effective_rpt_capacity + countries_offset_from_rpt_end
+        effective_rpt_capacity = max(rpt_needed, mapping.rpt_default_capacity)
+        rpt_start_final = total_row + mapping.rpt_header_offset + 1
+        countries_row = rpt_start_final + effective_rpt_capacity + mapping.countries_offset_from_rpt_end
+        lit_header_row = countries_row + mapping.lit_header_offset_from_countries
+        lit_data_start = lit_header_row + 1 + cumulative_delta  # add previous deltas
+        lit_expanded_path = out_path + ".lit_expanded.tmp"
+        insert_rows_safe(
+            src_path=current_path,
+            out_path=lit_expanded_path,
+            sheet_name=sheet_name,
+            threshold=lit_data_start,
+            delta=delta_lit,
+        )
+        current_path = lit_expanded_path
+        cumulative_delta += delta_lit
+        logger.info(
+            "Litigation table expanded by %d rows (needed %d, had %d)",
+            delta_lit, lit_needed, mapping.lit_default_capacity,
+        )
+
+    # Rename last tmp file to the requested out_path
+    import os, shutil
+    shutil.move(current_path, out_path)
+    # Clean up intermediate tmp if it still exists (e.g. only one expansion ran)
+    for tmp in [out_path + ".rpt_expanded.tmp", out_path + ".lit_expanded.tmp"]:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+    return out_path, cumulative_delta
 
 
 # ---------------------------------------------------------------------------
@@ -195,46 +318,44 @@ def fill_factsheet(
     rpt_header_row = total_row + mapping.rpt_header_offset
     rpt_start = rpt_header_row + 1
 
-    rpt_capacity = mapping.rpt_default_capacity
-    rpt_written = min(len(items), rpt_capacity)
-    rpt_dropped = max(0, len(items) - rpt_capacity)
+    # Use the actual capacity available in the (possibly expanded) template.
+    # This is the number of rows between rpt_start and the next static section.
+    # We no longer cap at a fixed default — any pre-expansion done by
+    # expand_dynamic_tables() has already made room for all items.
+    rpt_capacity = len(items) if len(items) > 0 else mapping.rpt_default_capacity
+    rpt_written = len(items)
+    rpt_dropped = 0
 
-    if rpt_dropped > 0:
-        result.warnings.append(
-            f"RPT: {rpt_dropped} items exceeded template capacity of {rpt_capacity} and were dropped. "
-            f"Consider expanding the template."
-        )
-        logger.warning("[%s] %d RPT items dropped (capacity=%d)", result.company_name, rpt_dropped, rpt_capacity)
-
-    if len(items) < rpt_capacity:
-        for i in range(len(items), rpt_capacity):
+    if len(items) < mapping.rpt_default_capacity:
+        for i in range(len(items), mapping.rpt_default_capacity):
             rows_to_hide.append(rpt_start + i)
 
     for i, item in enumerate(items):
-        if i >= rpt_capacity:
-            break
         rn = rpt_start + i
         ws[f"C{rn}"] = item["label"]
         ws[f"D{rn}"] = item["value_fy25"]
         comment_text = f"Source: {rpt['source']}"
-        if item.get("value_fy25") and float(item["value_fy25"]) < 0:
+        value_fy25 = item.get("value_fy25")
+        if value_fy25 is not None and float(value_fy25) < 0:
             comment_text += " | Sign convention: negative = net amount receivable."
         ws[f"D{rn}"].comment = Comment(comment_text, AUTHOR)
 
     result.rpt_rows_written = rpt_written
     result.rpt_rows_dropped = rpt_dropped
 
-    # AE revenue cross-check
-    ws[mapping.ae_revenue_sr9_cell] = 0
+    # AE revenue Sr 9: derive from validated extraction data instead of hardcoding 0.
+    # export_ae_fy25 represents revenue from services sold to foreign (non-Indian) AEs.
+    ae_sr9_value = f_.get("ae_revenue_split", {}).get("value", {}).get("export_ae_fy25", 0) or 0
+    ws[mapping.ae_revenue_sr9_cell] = ae_sr9_value
     ws[mapping.ae_revenue_sr9_cell].comment = Comment(
-        f"AE revenues (Sale of services to foreign AEs) cross-checked against RPT table. {ae_source}",
+        f"AE revenues (Sale of services to foreign AEs) from ae_revenue_split.export_ae_fy25. {ae_source}",
         AUTHOR,
     )
 
     # ===================================================================
     # COUNTRIES OF PRESENCE
     # ===================================================================
-    countries_row = rpt_start + rpt_capacity + mapping.countries_offset_from_rpt_end
+    countries_row = rpt_start + max(rpt_capacity, mapping.rpt_default_capacity) + mapping.countries_offset_from_rpt_end
     _note(ws, f"C{countries_row}", f_["countries_presence"]["value"], f_["countries_presence"]["source"])
 
     # ===================================================================
@@ -244,23 +365,16 @@ def fill_factsheet(
     lit_start = lit_header_row + 1
     lit_items = f_["litigation"]["items"]
 
-    lit_capacity = mapping.lit_default_capacity
-    lit_written = min(len(lit_items), lit_capacity)
-    lit_dropped = max(0, len(lit_items) - lit_capacity)
+    # No capacity cap — expand_dynamic_tables() has already made room.
+    lit_capacity = len(lit_items) if len(lit_items) > 0 else mapping.lit_default_capacity
+    lit_written = len(lit_items)
+    lit_dropped = 0
 
-    if lit_dropped > 0:
-        result.warnings.append(
-            f"Litigation: {lit_dropped} items exceeded template capacity of {lit_capacity} and were dropped."
-        )
-        logger.warning("[%s] %d Litigation items dropped (capacity=%d)", result.company_name, lit_dropped, lit_capacity)
-
-    if len(lit_items) < lit_capacity:
-        for i in range(len(lit_items), lit_capacity):
+    if len(lit_items) < mapping.lit_default_capacity:
+        for i in range(len(lit_items), mapping.lit_default_capacity):
             rows_to_hide.append(lit_start + i)
 
     for i, it in enumerate(lit_items):
-        if i >= lit_capacity:
-            break
         rn = lit_start + i
         ws[f"C{rn}"] = it.get("nature_of_dues")
         ws[f"D{rn}"] = it.get("amount_demanded_lakhs")
@@ -275,7 +389,7 @@ def fill_factsheet(
     # ===================================================================
     # WEBSITE / LINKEDIN
     # ===================================================================
-    website_row = lit_header_row + lit_capacity + (mapping.web_offset_from_lit_header - mapping.lit_header_offset_from_countries)
+    website_row = lit_header_row + max(lit_capacity, mapping.lit_default_capacity) + (mapping.web_offset_from_lit_header - mapping.lit_header_offset_from_countries)
     _note(ws, f"C{website_row}", f_["website"]["value"], f_["website"]["source"])
     _note(ws, f"C{website_row + 1}", f_["linkedin"]["value"], f_["linkedin"]["source"])
 

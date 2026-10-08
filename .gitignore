@@ -14,7 +14,9 @@ env/
 # Temp files and outputs
 *.tmp
 temp/
+data/outputs/
 *_Filled_BD.xlsx
+*_Filled.xlsx
 *_extracted.json
 ~$*
 

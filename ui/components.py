@@ -3,8 +3,8 @@ ui/components.py
 
 Reusable Streamlit UI components for ALFA.
 
-  - Metric cards bar (total, success, failed, pending)
-  - Per-company status cards with badges
+  - Metric cards bar (native st.metric)
+  - Per-company status cards (st.html)
   - Interactive preview editor (st.data_editor)
   - ZIP packaging for bulk downloads
 """
@@ -17,61 +17,47 @@ from typing import Dict, List, Optional
 
 
 # ---------------------------------------------------------------------------
-# Metric cards
+# Metric cards — using native st.metric inside bordered containers
 # ---------------------------------------------------------------------------
 
 def render_metrics_bar(total: int, success: int, failed: int, pending: int):
-    """Render a row of four styled metric cards."""
+    """Render a row of four native metric cards."""
     cols = st.columns(4)
-    cards = [
-        ("total", ":material/description: Total", total),
-        ("success", ":material/check_circle: Succeeded", success),
-        ("failed", ":material/error: Failed", failed),
-        ("pending", ":material/schedule: Pending", pending),
-    ]
-    for col, (css_class, label, value) in zip(cols, cards):
-        with col:
-            st.markdown(
-                f"""
-                <div class="metric-card {css_class}">
-                    <div class="metric-label">{label}</div>
-                    <div class="metric-value">{value}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+    with cols[0]:
+        st.metric("Total", total)
+    with cols[1]:
+        st.metric("Succeeded", success)
+    with cols[2]:
+        st.metric("Failed", failed)
+    with cols[3]:
+        st.metric("Pending", pending)
 
 
 # ---------------------------------------------------------------------------
-# Status badges
+# Status badges — using st.html for reliable HTML rendering
 # ---------------------------------------------------------------------------
 
-_STATUS_LABELS = {
-    "pending": "Pending",
-    "processing": "Processing",
-    "success": "Success",
-    "failed": "Failed",
+_BADGE_COLORS = {
+    "pending":    ("#fbbf24", "rgba(251,191,36,0.15)", "rgba(251,191,36,0.3)"),
+    "processing": ("#60a5fa", "rgba(96,165,250,0.15)", "rgba(96,165,250,0.3)"),
+    "success":    ("#34d399", "rgba(52,211,153,0.15)", "rgba(52,211,153,0.3)"),
+    "failed":     ("#f87171", "rgba(248,113,113,0.15)", "rgba(248,113,113,0.3)"),
 }
 
 
 def render_company_card(name: str, status: str, mode: str = "", error: str = ""):
-    """Render a single company status card."""
-    badge_label = _STATUS_LABELS.get(status, status)
-    mode_text = f'<span class="company-mode">({mode})</span>' if mode else ""
-    error_html = f'<div style="color:#f87171;font-size:0.8rem;margin-top:0.4rem;">{error}</div>' if error else ""
+    """Render a single company status card using st.html."""
+    label = {"pending": "Pending", "processing": "Processing", "success": "Success", "failed": "Failed"}.get(status, status)
+    text_clr, bg_clr, border_clr = _BADGE_COLORS.get(status, ("#94a3b8", "rgba(148,163,184,0.15)", "rgba(148,163,184,0.3)"))
 
-    st.markdown(
-        f"""
-        <div class="company-card">
-            <div>
-                <span class="company-name">{name}</span>
-                {mode_text}
-                {error_html}
-            </div>
-            <span class="status-badge {status}">{badge_label}</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    mode_html = f'<span style="font-size:0.78rem;opacity:0.5;margin-left:8px;">({mode})</span>' if mode else ""
+    error_block = f'<div style="color:#f87171;font-size:0.8rem;margin-top:6px;">{error}</div>' if error else ""
+
+    st.html(
+        f'<div style="border:1px solid rgba(128,128,128,0.15);border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">'
+        f'<div><span style="font-weight:600;font-size:0.95rem;">{name}</span>{mode_html}{error_block}</div>'
+        f'<span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:0.78rem;font-weight:600;letter-spacing:0.03em;color:{text_clr};background:{bg_clr};border:1px solid {border_clr};">{label}</span>'
+        f'</div>'
     )
 
 

@@ -7,3 +7,7 @@ python-dotenv
 tenacity
 pytest
 pandas
+# FastAPI serving layer (headless API alternative to Streamlit)
+fastapi
+uvicorn[standard]
+python-multipart
