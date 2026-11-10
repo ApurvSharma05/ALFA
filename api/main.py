@@ -72,8 +72,8 @@ def _get_extractor(api_key: Optional[str] = None) -> GeminiExtractor:
         raise HTTPException(
             status_code=401,
             detail=(
-                "Gemini API key is required. Pass it as the 'x-gemini-api-key' "
-                "header or set GEMINI_API_KEY in the environment."
+                "Gemini API key is required. Send it as the 'api_key' form field "
+                "or set GEMINI_API_KEY in the environment."
             ),
         )
     return GeminiExtractor(
@@ -105,8 +105,8 @@ def health() -> HealthResponse:
     tags=["Extraction"],
     responses={
         400: {"model": ErrorResponse, "description": "Invalid or unreadable PDF."},
-        401: {"model": ErrorResponse, "description": "Missing or invalid Gemini API key."},
-        502: {"model": ErrorResponse, "description": "Gemini API returned an error after retries."},
+        401: {"model": ErrorResponse, "description": "Missing Gemini API key (form field `api_key` or GEMINI_API_KEY env var)."},
+        502: {"model": ErrorResponse, "description": "Gemini API error (after retries for transient errors) or output that failed schema validation."},
     },
 )
 async def extract(
@@ -117,8 +117,12 @@ async def extract(
     """
     Accept a PDF upload and a company name, run the dual-mode extraction
     pipeline (text → Gemini text request; scanned → Gemini File/Vision API),
-    validate the result against the CompanyData Pydantic schema, and return
-    the structured JSON.
+    and return the structured JSON. The extractor validates the model output
+    against the CompanyData Pydantic schema (coercing numeric strings); output
+    that fails validation is reported as a 502 with the validation errors.
+
+    The Gemini key is read from the optional ``api_key`` multipart form field
+    (not a header), falling back to the GEMINI_API_KEY environment variable.
 
     The returned ``data`` dict can be passed directly to POST /v1/fill.
     """

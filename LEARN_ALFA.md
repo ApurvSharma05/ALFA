@@ -199,7 +199,7 @@ The schema is also passed to Gemini through `response_schema=CompanyData`, which
 
 ### Tenacity
 
-`tenacity` retries Gemini calls after failures. The current retry policy allows up to five attempts and uses exponential waits between two and thirty seconds.
+`tenacity` retries Gemini calls after transient failures only (HTTP 408/429, 5xx, and network errors such as timeouts; auth and bad-request errors fail immediately). The current retry policy allows up to five attempts and uses exponential waits between two and thirty seconds.
 
 ### Pandas
 
@@ -543,6 +543,7 @@ Private retried Gemini text call. It sends a text prompt to `generate_content()`
 
 The `@retry` decorator uses:
 
+- `retry_if_exception(_is_transient)`: only 408/429/5xx and network errors are retried.
 - `stop_after_attempt(5)`.
 - `wait_exponential(multiplier=1, min=2, max=30)`.
 - Logging before sleeps.
@@ -550,10 +551,11 @@ The `@retry` decorator uses:
 
 ### `extract_from_text(text, company_name)`
 
-Builds a prompt containing the company name and extracted annual-report text. It calls `_call_text()`, parses the returned JSON, and returns a successful `ExtractionResult`.
+Builds a prompt containing the company name and extracted annual-report text. It calls `_call_text()`, parses the returned JSON, validates it with `CompanyData.model_validate()` (the coerced dict is what is returned), and returns a successful `ExtractionResult`.
 
 It separately catches:
 
+- `pydantic.ValidationError` when the JSON does not match `CompanyData` (the error message lists the failing fields).
 - `json.JSONDecodeError` for invalid JSON.
 - Any other exception for API or runtime failures.
 
@@ -568,7 +570,7 @@ Vision-mode extraction function.
 1. Uploads the PDF using `client.files.upload()`.
 2. Builds a prompt referring to the attached PDF.
 3. Calls `_call_vision()`.
-4. Parses JSON.
+4. Parses and schema-validates the JSON.
 5. Always attempts to delete the remote uploaded file in `finally`.
 
 The cleanup is important because temporary API files should not accumulate.
